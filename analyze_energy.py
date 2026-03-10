@@ -69,15 +69,7 @@ else:
         else:
             print_error("Invalid choice. Please try again.")
 
-# Create output folder
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-output_base = "output"
-folder_name = f"{timestamp}_{os.path.basename(filename)}"
-output_dir = os.path.join(output_base, folder_name)
-os.makedirs(output_dir, exist_ok=True)
-
 print_info(f"Analyzing {C_BOLD}{filename}{C_RESET}...")
-print_info(f"Results will be saved in: {C_BOLD}{output_dir}{C_RESET}")
 
 ns = {'espi': 'http://naesb.org/espi', 'atom': 'http://www.w3.org/2005/Atom'}
 
@@ -203,7 +195,17 @@ if df.empty:
     print_error("No data found in the selected range! Exiting.")
     exit(1)
 
+# Create output folder after date range is finalized
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+output_base = "output"
+start_str = available_start.strftime('%Y-%m-%d')
+end_str = available_end.strftime('%Y-%m-%d')
+folder_name = f"{timestamp}_{start_str}_to_{end_str}"
+output_dir = os.path.join(output_base, folder_name)
+os.makedirs(output_dir, exist_ok=True)
+
 print_success(f"Analyzing data from {C_BOLD}{available_start}{C_RESET} to {C_BOLD}{available_end}{C_RESET}")
+print_info(f"Results will be saved in: {C_BOLD}{output_dir}{C_RESET}")
 
 # Calculate Amperes (Assuming 120V residential supply)
 voltage = 120

@@ -18,42 +18,50 @@ python3 -m venv venv
 
 ## Usage
 
-You can use the provided `run.sh` script to launch the analysis with different modes.
+Simply run the provided `run.sh` script to launch the interactive analysis tool.
 
-### Run Hourly Energy Analysis (default)
 ```bash
-./run.sh hourly
+./run.sh
 ```
 
-### Run Daily Energy Analysis
-```bash
-./run.sh daily
-```
-
-### Run Hourly AMP Usage Analysis (Estimated at 120V)
-```bash
-./run.sh amps
-```
+The tool will:
+1. Clear the console and show a colorful interface.
+2. Automatically detect `.xml` files. If multiple are found, you'll be prompted to choose one.
+3. Show the available date range in the data and allow you to optionally filter it.
+4. Detect your system timezone and apply it to all graphs and data points.
+5. Generate up to 8 different visualizations and a detailed CSV file.
 
 ## Output
 
-The script creates an `output/` directory and saves the generated plots and data within a timestamped subfolder named after the analyzed XML file (e.g., `output/20260309_233516_Elexicon_Electricity_...xml/`):
-- `graph1_hourly_timeseries.png` (Hourly usage with background colored by rate tiers)
-- `graph2_avg_hourly_profile.png` (Average hourly profile with background colored by rate tiers)
-- `graph3_daily_usage.png` (Daily usage stacked by rate tiers with totals on top)
-- `graph4_ampere_stats.png` (Estimated Ampere stats with background colored by rate tiers)
-- `graph5_avg_cost_profile.png` (Average cost profile with background colored by rate tiers)
-- `graph6_daily_cost.png` (Daily cost stacked by rate tiers with totals on top)
-- `graph7_tier_distribution.png` (Usage and cost split by peak tiers - only if `TieredRates.txt` is available)
-- `graph8_usage_heatmap.png` (Heatmap of hourly usage by day - only if `TieredRates.txt` is available)
-- `hourly_data_points.csv` (Detailed hourly data including rates and costs)
+The script creates an `output/` directory and saves the generated plots and data within a timestamped subfolder reflecting the analyzed date range (e.g., `output/20260310_003516_2024-03-09_to_2026-03-09/`):
+
+### Basic Energy & Ampere Graphs
+- `graph1_hourly_timeseries.png`: Hourly usage with background colored by rate tiers.
+- `graph2_avg_hourly_profile.png`: Average hourly profile (24h) with background colored by rate tiers.
+- `graph3_daily_usage.png`: Daily usage stacked by rate tiers with totals on top.
+- `graph4_ampere_stats.png`: Estimated Ampere stats (Min/Max/Avg) at 120V with background colored by rate tiers.
+
+### Cost-Related Graphs (Requires `TieredRates.txt`)
+- `graph5_avg_cost_profile.png`: Average hourly cost profile with background colored by rate tiers.
+- `graph6_daily_cost.png`: Daily cost totals stacked by rate tiers with totals on top.
+- `graph7_tier_distribution.png`: Pie charts showing usage and cost split by peak tiers.
+- `graph8_usage_heatmap.png`: Heatmap showing hourly usage patterns across all analyzed days.
+
+### Raw Data
+- `hourly_data_points.csv`: Detailed hourly data points including timestamps (local timezone), kWh usage, estimated Amps, applicable rates (¢), and calculated cost (¢).
 
 ## Features
 
-- **Tiered Rate Analysis**: Automatically reads `TieredRates.txt` (if available) to calculate costs. The file structure should include `tier_name` and `color_code` columns (e.g., `time_range:charge_per_kwh:currency_to_display:day_type:tier_name:color_code`). All cost visualizations use ¢ as the unit and apply colors specified in the file.
-- **Dynamic Timezone**: Detects and applies system timezone to all data and labels.
-- **Advanced Visualizations**: Includes heatmaps and distribution charts for deeper insights into energy consumption patterns.
+- **Interactive Workflow**: Easy file selection and custom date range filtering directly from the terminal.
+- **Dynamic Timezone**: Automatically detects and applies system timezone (e.g., EDT, EST, PDT) to all data and labels.
+- **Customizable Tiered Rates**: Use `TieredRates.txt` to define peak tiers, costs (¢/kWh), and custom colors (Hex) for graphs.
+- **Colorful Terminal Output**: Uses ANSI colors to provide clear feedback and progress updates.
+- **Professional Visualizations**: High-quality plots using `matplotlib` and `seaborn` for deeper insights into energy consumption patterns.
 
-## Requirements
+## Configuration (TieredRates.txt)
 
-The analysis script `analyze_energy.py` searches for all `.xml` files in the project directory. If multiple files are found, it will prompt you to choose one.
+If available, the tool reads `TieredRates.txt` to calculate costs and color-code graphs. The file uses a colon-separated format with the following headers:
+`time_range:charge_per_kwh:currency_to_display:day_type:tier_name:color_code`
+
+Example:
+`0700_till_1100:18.2:¢/kWh:Weekday:On-Peak:#ffaaa5`
