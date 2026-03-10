@@ -35,17 +35,19 @@ The tool will:
 
 The script creates an `output/` directory and saves the generated plots and data within a timestamped subfolder reflecting the analyzed date range (e.g., `output/20260310_003516_2024-03-09_to_2026-03-09/`):
 
-### Basic Energy & Ampere Graphs
+### Hourly Energy & Ampere Graphs
 - `graph1_hourly_timeseries.png`: Hourly usage with background colored by rate tiers.
-- `graph2_avg_hourly_profile.png`: Average hourly profile (24h) with background colored by rate tiers.
-- `graph3_daily_usage.png`: Daily usage stacked by rate tiers with totals on top.
-- `graph4_ampere_stats.png`: Estimated Ampere stats (Min/Max/Avg) at 120V with background colored by rate tiers.
+- `graph2_hourly_avg_profile.png`: Average hourly profile (24h) with background colored by rate tiers.
+- `graph3_hourly_ampere_stats.png`: Estimated Ampere stats (Min/Max/Avg) at 120V with background colored by rate tiers.
+- `graph4_hourly_avg_cost_profile.png`: Average hourly cost profile with background colored by rate tiers (Requires `TieredRates.txt`).
+- `graph5_hourly_usage_heatmap.png`: Heatmap showing hourly usage patterns across all analyzed days.
 
-### Cost-Related Graphs (Requires `TieredRates.txt`)
-- `graph5_avg_cost_profile.png`: Average hourly cost profile with background colored by rate tiers.
-- `graph6_daily_cost.png`: Daily cost totals stacked by rate tiers with totals on top.
-- `graph7_tier_distribution.png`: Pie charts showing usage and cost split by peak tiers.
-- `graph8_usage_heatmap.png`: Heatmap showing hourly usage patterns across all analyzed days.
+### Daily Energy & Cost Graphs
+- `graph6_daily_usage.png`: Daily usage stacked by rate tiers with totals on top.
+- `graph7_daily_cost.png`: Daily cost totals stacked by rate tiers with totals on top (Requires `TieredRates.txt`).
+
+### Period Summary Graphs
+- `graph8_tier_distribution.png`: Pie charts showing usage and cost split by rate tiers for the entire period.
 
 ### Raw Data
 - `hourly_data_points.csv`: Detailed hourly data points including timestamps (local timezone), kWh usage, estimated Amps, applicable rates (¢), and calculated cost (¢).

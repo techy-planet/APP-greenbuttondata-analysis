@@ -306,7 +306,7 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph1_hourly_timeseries.png'))
 plt.close()
 
-# Graph 2: Average kWh Profile by Hour
+# Graph 2: Hourly Average Profile
 plt.figure(figsize=(10, 5))
 plt.plot(avg_kwh_profile.index, avg_kwh_profile.values, marker='o', color='black', zorder=3)
 
@@ -330,46 +330,10 @@ plt.ylabel('Average Usage (kWh)')
 plt.xticks(range(0, 24))
 plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'graph2_avg_hourly_profile.png'))
+plt.savefig(os.path.join(output_dir, 'graph2_hourly_avg_profile.png'))
 plt.close()
 
-# Graph 3: Daily Totals
-plt.figure(figsize=(12, 6))
-if has_rates:
-    # Stacked bar by tier
-    # Prepare data: sum usage per day and tier
-    # We use dt_local.dt.date for grouping by day
-    daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
-    
-    # Use the same tier_colors
-    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_usage.columns]
-    
-    ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
-    plt.legend(title="Rate Tier")
-    
-    # Calculate totals for labels
-    totals = daily_tier_usage.sum(axis=1)
-else:
-    # Regular bar chart if no rates
-    ax = daily_usage.plot(kind='bar', color=sns.color_palette("viridis", len(daily_usage)), ax=plt.gca())
-    totals = daily_usage
-
-# Add total values on top of bars
-for i, total in enumerate(totals):
-    if total > 0:
-        plt.text(i, total + (totals.max() * 0.01), f'{total:.1f}', 
-                 ha='center', va='bottom', rotation=90, fontsize=9)
-
-plt.title(f'Daily Electricity Usage Total ({tz_name})')
-plt.xlabel(f'Date ({tz_name})')
-plt.ylabel('Total Daily Usage (kWh)')
-plt.xticks(rotation=45)
-plt.grid(axis='y', linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'graph3_daily_usage.png'))
-plt.close()
-
-# Graph 4: Ampere Stats Profile (Min, Max, Avg)
+# Graph 3: Hourly Ampere Stats Profile (Min, Max, Avg)
 plt.figure(figsize=(12, 6))
 
 # Plot the stats
@@ -405,11 +369,11 @@ plt.ylabel('Current (Amperes)')
 plt.xticks(range(0, 24))
 plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, 'graph4_ampere_stats.png'))
+plt.savefig(os.path.join(output_dir, 'graph3_hourly_ampere_stats.png'))
 plt.close()
 
 if has_rates:
-    # Graph 5: Average Cost Profile by Hour
+    # Graph 4: Hourly Average Cost Profile
     plt.figure(figsize=(10, 5))
     plt.plot(avg_cost_profile.index, avg_cost_profile.values, marker='s', color='black', zorder=3)
     
@@ -431,10 +395,58 @@ if has_rates:
     plt.xticks(range(0, 24))
     plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'graph5_avg_cost_profile.png'))
+    plt.savefig(os.path.join(output_dir, 'graph4_hourly_avg_cost_profile.png'))
     plt.close()
 
-    # Graph 6: Daily Total Cost
+# Graph 5: Hourly Usage Heatmap by Day and Hour
+pivot_df = hourly_df.pivot_table(index=hourly_df['dt_local'].dt.date, columns='hour', values='usage_kwh')
+plt.figure(figsize=(16, 8))
+sns.heatmap(pivot_df, cmap='YlOrRd', annot=False)
+plt.title(f'Heatmap of Hourly Usage (kWh) - {tz_name}')
+plt.xlabel(f'Hour of Day ({tz_name})')
+plt.ylabel('Date')
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'graph5_hourly_usage_heatmap.png'))
+plt.close()
+
+# Graph 6: Daily Usage Totals
+plt.figure(figsize=(12, 6))
+if has_rates:
+    # Stacked bar by tier
+    # Prepare data: sum usage per day and tier
+    # We use dt_local.dt.date for grouping by day
+    daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
+    
+    # Use the same tier_colors
+    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_usage.columns]
+    
+    ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
+    plt.legend(title="Rate Tier")
+    
+    # Calculate totals for labels
+    totals = daily_tier_usage.sum(axis=1)
+else:
+    # Regular bar chart if no rates
+    ax = daily_usage.plot(kind='bar', color=sns.color_palette("viridis", len(daily_usage)), ax=plt.gca())
+    totals = daily_usage
+
+# Add total values on top of bars
+for i, total in enumerate(totals):
+    if total > 0:
+        plt.text(i, total + (totals.max() * 0.01), f'{total:.1f}', 
+                 ha='center', va='bottom', rotation=90, fontsize=9)
+
+plt.title(f'Daily Electricity Usage Total ({tz_name})')
+plt.xlabel(f'Date ({tz_name})')
+plt.ylabel('Total Daily Usage (kWh)')
+plt.xticks(rotation=45)
+plt.grid(axis='y', linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.savefig(os.path.join(output_dir, 'graph6_daily_usage.png'))
+plt.close()
+
+if has_rates:
+    # Graph 7: Daily Total Cost
     plt.figure(figsize=(12, 6))
     # Stacked bar by tier for cost
     daily_tier_cost = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['cost_cents'].sum().unstack().fillna(0)
@@ -456,10 +468,10 @@ if has_rates:
     plt.xticks(rotation=45)
     plt.grid(axis='y', linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'graph6_daily_cost.png'))
+    plt.savefig(os.path.join(output_dir, 'graph7_daily_cost.png'))
     plt.close()
 
-    # Graph 7: Usage and Cost by Rate Tier
+    # Graph 8: Tier Distribution (Period Totals)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
     # Get colors for existing tiers in this dataset
@@ -474,18 +486,7 @@ if has_rates:
     ax2.set_ylabel('')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'graph7_tier_distribution.png'))
-    plt.close()
-
-    # Graph 8: Heatmap of Usage by Day and Hour
-    pivot_df = hourly_df.pivot_table(index=hourly_df['dt_local'].dt.date, columns='hour', values='usage_kwh')
-    plt.figure(figsize=(16, 8))
-    sns.heatmap(pivot_df, cmap='YlOrRd', annot=False)
-    plt.title(f'Heatmap of Hourly Usage (kWh) - {tz_name}')
-    plt.xlabel(f'Hour of Day ({tz_name})')
-    plt.ylabel('Date')
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'graph8_usage_heatmap.png'))
+    plt.savefig(os.path.join(output_dir, 'graph8_tier_distribution.png'))
     plt.close()
 
 print_header("Processing Complete")
