@@ -4,7 +4,8 @@
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment and installing dependencies..."
     python3 -m venv venv
-    ./venv/bin/pip install pandas matplotlib
+    ./venv/bin/pip install --upgrade pip
+    ./venv/bin/pip install pandas matplotlib numpy openpyxl seaborn
 fi
 
 # Run the analysis script with provided argument

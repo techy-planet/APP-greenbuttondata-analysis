@@ -9,5 +9,8 @@
 # Editor-based HTTP Client requests
 /httpRequests/
 
+# Output
+output
+
 # IntelliJ
 .idea
