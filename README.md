@@ -38,9 +38,9 @@ You can use the provided `run.sh` script to launch the analysis with different m
 ## Output
 
 The script creates an `output/` directory and saves the generated plots and data within a timestamped subfolder named after the analyzed XML file (e.g., `output/20260309_233516_Elexicon_Electricity_...xml/`):
-- `graph1_hourly_timeseries.png`
-- `graph2_avg_hourly_profile.png`
-- `graph3_daily_usage.png`
+- `graph1_hourly_timeseries.png` (Hourly usage with background colored by rate tiers)
+- `graph2_avg_hourly_profile.png` (Average hourly profile with background colored by rate tiers)
+- `graph3_daily_usage.png` (Daily usage stacked by rate tiers with totals on top)
 - `graph4_ampere_stats.png` (Estimated Ampere stats with background colored by rate tiers)
 - `graph5_avg_cost_profile.png` (Average cost profile using tiered rates - only if `TieredRates.txt` is available)
 - `graph6_daily_cost.png` (Total daily cost in ¢ - only if `TieredRates.txt` is available)

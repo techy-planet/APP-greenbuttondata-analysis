@@ -81,8 +81,8 @@ if os.path.exists(rates_file):
         
         for _, row in rates_df.iterrows():
             time_range = str(row['time_range']).strip()
-            charge = float(row['charge per kwh'])
-            day_type = str(row['day type']).strip()
+            charge = float(row['charge_per_kwh'])
+            day_type = str(row['day_type']).strip()
             tier_name = str(row['tier_name']).strip() if 'tier_name' in row else "Other"
             
             start_hour = int(time_range.split('_')[0][:2])
@@ -196,30 +196,91 @@ print(f"Data points saved to: {csv_path}")
 
 # Graph 1: Hourly Time Series
 plt.figure(figsize=(15, 6))
-plt.plot(hourly_df['dt_local'], hourly_df['usage_kwh'], color='tab:blue', linewidth=1)
+plt.plot(hourly_df['dt_local'], hourly_df['usage_kwh'], color='black', linewidth=1, zorder=3)
+
+# Add background colors for tiers if available
+if has_rates:
+    from matplotlib.patches import Patch
+    # Plot background for each data point
+    # To avoid many rectangles, we can find contiguous blocks of the same tier
+    # or just iterate and fill per hour (more straightforward)
+    for i in range(len(hourly_df)):
+        row = hourly_df.iloc[i]
+        dt = row['dt_local']
+        tier = row['tier']
+        color = tier_colors.get(tier, '#f0f0f0')
+        # Fill 1 hour span
+        plt.axvspan(dt, dt + timedelta(hours=1), facecolor=color, alpha=0.3, zorder=1)
+
+    # Create custom legend for tiers
+    legend_elements = [
+        Patch(facecolor=tier_colors.get(name), alpha=0.3, label=name)
+        for name in tier_names_list
+    ]
+    plt.legend(handles=legend_elements, loc='upper left')
+
 plt.title(f'Hourly Electricity Usage (Time Series) - {tz_name}')
 plt.xlabel(f'Date ({tz_name})')
 plt.ylabel('Usage (kWh)')
-plt.grid(True, alpha=0.3)
+plt.grid(True, alpha=0.3, zorder=0)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph1_hourly_timeseries.png'))
 plt.close()
 
 # Graph 2: Average kWh Profile by Hour
 plt.figure(figsize=(10, 5))
-plt.plot(avg_kwh_profile.index, avg_kwh_profile.values, marker='o', color='tab:orange')
+plt.plot(avg_kwh_profile.index, avg_kwh_profile.values, marker='o', color='black', zorder=3)
+
+# Add background colors for tiers if available
+if has_rates:
+    from matplotlib.patches import Patch
+    for h in range(24):
+        tier = tier_schedule[h]
+        color = tier_colors.get(tier, '#f0f0f0')
+        plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.3, zorder=1)
+    
+    legend_elements = [
+        Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
+        for name in tier_names_list
+    ]
+    plt.legend(handles=legend_elements, loc='upper left')
+
 plt.title(f'Average Electricity Usage by Hour of Day ({tz_name})')
 plt.xlabel(f'Hour of Day (24h) - {tz_name}')
 plt.ylabel('Average Usage (kWh)')
 plt.xticks(range(0, 24))
-plt.grid(True, linestyle='--', alpha=0.5)
+plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph2_avg_hourly_profile.png'))
 plt.close()
 
 # Graph 3: Daily Totals
-plt.figure(figsize=(12, 5))
-daily_usage.plot(kind='bar', color='tab:green')
+plt.figure(figsize=(12, 6))
+if has_rates:
+    # Stacked bar by tier
+    # Prepare data: sum usage per day and tier
+    # We use dt_local.dt.date for grouping by day
+    daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
+    
+    # Use the same tier_colors
+    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_usage.columns]
+    
+    ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
+    plt.legend(title="Rate Tier")
+    
+    # Calculate totals for labels
+    totals = daily_tier_usage.sum(axis=1)
+else:
+    # Regular bar chart if no rates
+    ax = daily_usage.plot(kind='bar', color=sns.color_palette("viridis", len(daily_usage)), ax=plt.gca())
+    totals = daily_usage
+
+# Add total values on top of bars
+for i, total in enumerate(totals):
+    if total > 0:
+        plt.text(i, total + (totals.max() * 0.01), f'{total:.1f}', 
+                 ha='center', va='bottom', rotation=90, fontsize=9)
+
 plt.title(f'Daily Electricity Usage Total ({tz_name})')
 plt.xlabel(f'Date ({tz_name})')
 plt.ylabel('Total Daily Usage (kWh)')

@@ -1,4 +1,4 @@
-time_range:charge per kwh:currency to display:day type:tier_name
+time_range:charge_per_kwh:currency_to_display:day_type:tier_name
 0000_till_0700:8.7:¢/kWh:Weekday:Off-Peak
 0700_till_1100:18.2:¢/kWh:Weekday:On-Peak
 1100_till_1700:12.2:¢/kWh:Weekday:Mid-Peak
