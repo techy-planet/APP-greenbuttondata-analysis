@@ -58,7 +58,7 @@ The script creates an `output/` directory and saves the generated plots and data
 - **Dynamic Timezone**: Automatically detects and applies system timezone (e.g., EDT, EST, PDT) to all data and labels.
 - **Customizable Tiered Rates**: Use `TieredRates.txt` to define peak tiers, costs (¢/kWh), and custom colors (Hex) for graphs.
 - **Colorful Terminal Output**: Uses ANSI colors to provide clear feedback and progress updates.
-- **Professional Visualizations**: High-quality plots using `matplotlib` and `seaborn` for deeper insights into energy consumption patterns.
+- **Professional Visualizations**: High-quality plots using `matplotlib` and `seaborn` for deeper insights. Default colors are provided even if `TieredRates.txt` is missing for a consistent look.
 
 ## Configuration (TieredRates.txt)
 

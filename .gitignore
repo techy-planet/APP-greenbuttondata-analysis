@@ -9,9 +9,10 @@
 # Editor-based HTTP Client requests
 /httpRequests/
 
-# Output
+# Temp Folders
 output
 .venv
+venv
 
 # IntelliJ
 .idea

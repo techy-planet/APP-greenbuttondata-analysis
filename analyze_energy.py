@@ -94,8 +94,23 @@ weekday_rates = {} # hour -> charge
 weekend_rates = {} # hour -> charge
 weekday_tier_names = {} # hour -> tier_name
 weekend_tier_names = {} # hour -> tier_name
-tier_colors = {} # tier_name -> color_code
+
+# Default colors (eye-soothing palette)
+DEFAULT_COLORS = {
+    'Off-Peak': '#a8e6cf',
+    'Mid-Peak': '#ffd3b6',
+    'On-Peak': '#ffaaa5',
+    'Other': '#ff4d4d'
+}
+tier_colors = DEFAULT_COLORS.copy()
 tier_names_list = [] # ordered list of tier names for color mapping
+
+# Default Tier Logic (used when TieredRates.txt is missing)
+def get_default_tier(hour):
+    # Default Night Time: 10 PM (22:00) to 7 AM (07:00)
+    if hour >= 22 or hour < 7:
+        return 'Off-Peak'
+    return 'Other'
 
 if os.path.exists(rates_file):
     print_info(f"Loading rates from {C_BOLD}{rates_file}{C_RESET}...")
@@ -243,7 +258,7 @@ if has_rates:
     df['cost_cents'] = df['usage_kwh'] * df['rate_cents']
 else:
     df['rate_cents'] = 0.0
-    df['tier'] = 'Other'
+    df['tier'] = df['dt_local'].dt.hour.apply(get_default_tier)
     df['cost_cents'] = 0.0
 
 # 4. Filter for Hourly Data and Sort
@@ -264,6 +279,14 @@ daily_usage = hourly_df.set_index('dt_local').resample('D')['usage_kwh'].sum()
 # Conditional Cost Analysis
 has_rates = bool(weekday_rates and weekend_rates)
 
+# Pre-calculate tier schedule for profile graphs (24 points)
+tier_schedule = []
+for h in range(24):
+    if has_rates:
+        tier_schedule.append(weekday_tier_names.get(h, "Other"))
+    else:
+        tier_schedule.append(get_default_tier(h))
+
 if has_rates:
     avg_cost_profile = hourly_df.groupby('hour')['cost_cents'].mean()
     daily_cost_cents = hourly_df.set_index('dt_local').resample('D')['cost_cents'].sum()
@@ -272,19 +295,13 @@ if has_rates:
     if 'Other' not in tier_colors:
         tier_colors['Other'] = '#f0f0f0'
 
-    # Mapping for Graph 4 background coloring
-    tier_schedule = []
-    for h in range(24):
-        # Default to weekday for the profile
-        tier_schedule.append(weekday_tier_names.get(h, "Other"))
-
     tier_usage = hourly_df.groupby('tier')['usage_kwh'].sum()
     tier_cost_cents = hourly_df.groupby('tier')['cost_cents'].sum()
 
 # --- SAVING DATA ---
 # Select and rename columns for clarity
-csv_df = hourly_df[['dt_local', 'usage_kwh', 'amps', 'rate_cents', 'cost_cents']].copy()
-csv_df.columns = [f'Local Time ({tz_name})', 'Usage (kWh)', 'Current (Amps)', 'Rate (¢/kWh)', 'Cost (¢)']
+csv_df = hourly_df[['dt_local', 'usage_kwh', 'amps', 'tier', 'rate_cents', 'cost_cents']].copy()
+csv_df.columns = [f'Local Time ({tz_name})', 'Usage (kWh)', 'Current (Amps)', 'Tier', 'Rate (¢/kWh)', 'Cost (¢)']
 
 # Save to CSV
 csv_filename = 'hourly_data_points.csv'
@@ -301,7 +318,7 @@ plt.figure(figsize=(15, 6))
 plt.plot(hourly_df['dt_local'], hourly_df['usage_kwh'], color='black', linewidth=1, zorder=3)
 
 # Add background colors for tiers if available
-if has_rates:
+if True: # Always add background, will use 'Other' if has_rates is False
     from matplotlib.patches import Patch
     # Plot background for each data point
     # To avoid many rectangles, we can find contiguous blocks of the same tier
@@ -310,16 +327,24 @@ if has_rates:
         row = hourly_df.iloc[i]
         dt = row['dt_local']
         tier = row['tier']
-        color = tier_colors.get(tier, '#f0f0f0')
+        color = tier_colors.get(tier, DEFAULT_COLORS['Other'])
         # Fill 1 hour span
         plt.axvspan(dt, dt + timedelta(hours=1), facecolor=color, alpha=0.3, zorder=1)
 
     # Create custom legend for tiers
-    legend_elements = [
-        Patch(facecolor=tier_colors.get(name), alpha=0.3, label=name)
-        for name in tier_names_list
-    ]
-    plt.legend(handles=legend_elements, loc='upper left')
+    if has_rates:
+        legend_elements = [
+            Patch(facecolor=tier_colors.get(name), alpha=0.3, label=name)
+            for name in tier_names_list
+        ]
+        plt.legend(handles=legend_elements, loc='upper left')
+    else:
+        # Show default tiers in legend if no rates
+        legend_elements = [
+            Patch(facecolor=DEFAULT_COLORS['Off-Peak'], alpha=0.3, label='Off-Peak (Default Night)'),
+            Patch(facecolor=DEFAULT_COLORS['Other'], alpha=0.3, label='Other')
+        ]
+        plt.legend(handles=legend_elements, loc='upper left')
 
 plt.title(f'Hourly Electricity Usage (Time Series) - {tz_name}')
 plt.xlabel(f'Date ({tz_name})')
@@ -334,18 +359,25 @@ plt.figure(figsize=(10, 5))
 plt.plot(avg_kwh_profile.index, avg_kwh_profile.values, marker='o', color='black', zorder=3)
 
 # Add background colors for tiers if available
-if has_rates:
+if True: # Always add background, will use 'Other' if has_rates is False
     from matplotlib.patches import Patch
     for h in range(24):
         tier = tier_schedule[h]
-        color = tier_colors.get(tier, '#f0f0f0')
+        color = tier_colors.get(tier, DEFAULT_COLORS['Other'])
         plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.3, zorder=1)
     
-    legend_elements = [
-        Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
-        for name in tier_names_list
-    ]
-    plt.legend(handles=legend_elements, loc='upper left')
+    if has_rates:
+        legend_elements = [
+            Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
+            for name in tier_names_list
+        ]
+        plt.legend(handles=legend_elements, loc='upper left')
+    else:
+        legend_elements = [
+            Patch(facecolor=DEFAULT_COLORS['Off-Peak'], alpha=0.3, label='Off-Peak (Default Night)'),
+            Patch(facecolor=DEFAULT_COLORS['Other'], alpha=0.3, label='Other')
+        ]
+        plt.legend(handles=legend_elements, loc='upper left')
 
 plt.title(f'Average Electricity Usage by Hour of Day ({tz_name})')
 plt.xlabel(f'Hour of Day (24h) - {tz_name}')
@@ -364,27 +396,34 @@ plt.plot(amp_stats.index, amp_stats['mean'], label='Average Amps', color='black'
 plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='gray', alpha=0.3, label='Min-Max Range', zorder=2)
 
 # Add background colors for tiers if available
-if has_rates:
+if True: # Always add background, will use 'Other' if has_rates is False
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
     # We want to draw vertical spans for each hour's tier
     for h in range(24):
         tier = tier_schedule[h]
-        color = tier_colors.get(tier, '#f0f0f0')
+        color = tier_colors.get(tier, DEFAULT_COLORS['Other'])
         plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.4, zorder=1)
         
     # Create custom legend for tiers
-    from matplotlib.patches import Patch
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Patch(facecolor=tier_colors.get(name), alpha=0.4, label=f'{name} (Weekday)')
-        for name in tier_names_list
-    ]
+    legend_elements = []
+    if has_rates:
+        legend_elements.extend([
+            Patch(facecolor=tier_colors.get(name), alpha=0.4, label=f'{name} (Weekday)')
+            for name in tier_names_list
+        ])
+    else:
+        # Default tiers if no rates
+        legend_elements.extend([
+            Patch(facecolor=DEFAULT_COLORS['Off-Peak'], alpha=0.4, label='Off-Peak (Default Night)'),
+            Patch(facecolor=DEFAULT_COLORS['Other'], alpha=0.4, label='Other')
+        ])
+
     legend_elements.extend([
         Line2D([0], [0], color='black', marker='o', label='Average Amps'),
         Patch(facecolor='gray', alpha=0.3, label='Min-Max Range')
     ])
     plt.legend(handles=legend_elements, loc='upper left')
-else:
-    plt.legend()
 
 plt.title(f'Hourly Ampere Profile (at 120V) - Local Time ({tz_name})')
 plt.xlabel(f'Hour of Day (24h) - Local Time ({tz_name})')
@@ -441,7 +480,7 @@ if has_rates:
     daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
     
     # Use the same tier_colors
-    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_usage.columns]
+    current_tier_colors = [tier_colors.get(tier, DEFAULT_COLORS['Other']) for tier in daily_tier_usage.columns]
     
     ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
     plt.legend(title="Rate Tier")
@@ -449,9 +488,18 @@ if has_rates:
     # Calculate totals for labels
     totals = daily_tier_usage.sum(axis=1)
 else:
-    # Regular bar chart if no rates
-    ax = daily_usage.plot(kind='bar', color=sns.color_palette("viridis", len(daily_usage)), ax=plt.gca())
-    totals = daily_usage
+    # Stacked bar by default tiers
+    daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
+    # Ensure all default tiers are present for consistent coloring
+    for t in ['Off-Peak', 'Other']:
+        if t not in daily_tier_usage.columns:
+            daily_tier_usage[t] = 0.0
+    daily_tier_usage = daily_tier_usage[['Off-Peak', 'Other']]
+    
+    current_tier_colors = [DEFAULT_COLORS['Off-Peak'], DEFAULT_COLORS['Other']]
+    ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
+    plt.legend(title="Default Tier (Night: 10PM-7AM)")
+    totals = daily_tier_usage.sum(axis=1)
 
 # Add total values on top of bars
 for i, total in enumerate(totals):
@@ -473,7 +521,7 @@ if has_rates:
     plt.figure(figsize=(12, 6))
     # Stacked bar by tier for cost
     daily_tier_cost = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['cost_cents'].sum().unstack().fillna(0)
-    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_cost.columns]
+    current_tier_colors = [tier_colors.get(tier, DEFAULT_COLORS['Other']) for tier in daily_tier_cost.columns]
     
     ax = daily_tier_cost.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
     plt.legend(title="Rate Tier")
