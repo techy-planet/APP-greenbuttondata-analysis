@@ -63,6 +63,7 @@ weekday_rates = {} # hour -> charge
 weekend_rates = {} # hour -> charge
 weekday_tier_names = {} # hour -> tier_name
 weekend_tier_names = {} # hour -> tier_name
+tier_colors = {} # tier_name -> color_code
 tier_names_list = [] # ordered list of tier names for color mapping
 
 if os.path.exists(rates_file):
@@ -84,6 +85,11 @@ if os.path.exists(rates_file):
             charge = float(row['charge_per_kwh'])
             day_type = str(row['day_type']).strip()
             tier_name = str(row['tier_name']).strip() if 'tier_name' in row else "Other"
+            color_code = str(row['color_code']).strip() if 'color_code' in row else "#f0f0f0"
+            
+            if tier_name not in tier_names_list:
+                tier_names_list.append(tier_name)
+            tier_colors[tier_name] = color_code
             
             start_hour = int(time_range.split('_')[0][:2])
             end_hour = int(time_range.split('_')[2][:2])
@@ -165,11 +171,9 @@ if has_rates:
     avg_cost_profile = hourly_df.groupby('hour')['cost_cents'].mean()
     daily_cost_cents = hourly_df.set_index('dt_local').resample('D')['cost_cents'].sum()
     
-    # Dynamic tier mapping for colors
-    # Use a vibrant palette (Set2 or Pastel1)
-    colors = sns.color_palette("Set2", len(tier_names_list))
-    tier_colors = {name: color for name, color in zip(tier_names_list, colors)}
-    tier_colors['Other'] = '#f0f0f0'
+    # Ensure 'Other' has a default color if not in file
+    if 'Other' not in tier_colors:
+        tier_colors['Other'] = '#f0f0f0'
 
     # Mapping for Graph 4 background coloring
     tier_schedule = []
@@ -332,19 +336,45 @@ plt.close()
 if has_rates:
     # Graph 5: Average Cost Profile by Hour
     plt.figure(figsize=(10, 5))
-    plt.plot(avg_cost_profile.index, avg_cost_profile.values, marker='s', color='tab:red')
+    plt.plot(avg_cost_profile.index, avg_cost_profile.values, marker='s', color='black', zorder=3)
+    
+    # Add background colors for tiers
+    for h in range(24):
+        tier = tier_schedule[h]
+        color = tier_colors.get(tier, '#f0f0f0')
+        plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.3, zorder=1)
+    
+    legend_elements = [
+        Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
+        for name in tier_names_list
+    ]
+    plt.legend(handles=legend_elements, loc='upper left')
+
     plt.title(f'Average Electricity Cost by Hour of Day ({tz_name})')
     plt.xlabel(f'Hour of Day (24h) - {tz_name}')
     plt.ylabel('Average Cost (¢)')
     plt.xticks(range(0, 24))
-    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'graph5_avg_cost_profile.png'))
     plt.close()
 
     # Graph 6: Daily Total Cost
-    plt.figure(figsize=(12, 5))
-    daily_cost_cents.plot(kind='bar', color='tab:red')
+    plt.figure(figsize=(12, 6))
+    # Stacked bar by tier for cost
+    daily_tier_cost = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['cost_cents'].sum().unstack().fillna(0)
+    current_tier_colors = [tier_colors.get(tier, '#f0f0f0') for tier in daily_tier_cost.columns]
+    
+    ax = daily_tier_cost.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
+    plt.legend(title="Rate Tier")
+    
+    # Calculate totals for labels
+    cost_totals = daily_tier_cost.sum(axis=1)
+    for i, total in enumerate(cost_totals):
+        if total > 0:
+            plt.text(i, total + (cost_totals.max() * 0.01), f'{total:.1f}', 
+                     ha='center', va='bottom', rotation=90, fontsize=9)
+
     plt.title(f'Daily Electricity Cost Total ({tz_name})')
     plt.xlabel(f'Date ({tz_name})')
     plt.ylabel('Total Daily Cost (¢)')

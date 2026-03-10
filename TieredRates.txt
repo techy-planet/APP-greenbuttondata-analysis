@@ -1,7 +1,7 @@
-time_range:charge_per_kwh:currency_to_display:day_type:tier_name
-0000_till_0700:8.7:¢/kWh:Weekday:Off-Peak
-0700_till_1100:18.2:¢/kWh:Weekday:On-Peak
-1100_till_1700:12.2:¢/kWh:Weekday:Mid-Peak
-1700_till_1900:18.2:¢/kWh:Weekday:On-Peak
-1900_till_2400:8.7:¢/kWh:Weekday:Off-Peak
-0000_till_2400:8.7:¢/kWh:Weekend:Off-Peak
+time_range:charge_per_kwh:currency_to_display:day_type:tier_name:color_code
+0000_till_0700:8.7:¢/kWh:Weekday:Off-Peak:#a8e6cf
+0700_till_1100:18.2:¢/kWh:Weekday:On-Peak:#ffaaa5
+1100_till_1700:12.2:¢/kWh:Weekday:Mid-Peak:#ffd3b6
+1700_till_1900:18.2:¢/kWh:Weekday:On-Peak:#ffaaa5
+1900_till_2400:8.7:¢/kWh:Weekday:Off-Peak:#a8e6cf
+0000_till_2400:8.7:¢/kWh:Weekend:Off-Peak:#a8e6cf
