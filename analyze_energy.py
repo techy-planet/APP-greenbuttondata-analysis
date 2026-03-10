@@ -156,6 +156,30 @@ if has_rates:
         if rate == 8.7: return 'Off-Peak'
         return 'Other'
 
+    # Mapping for Graph 4 background coloring
+    # We choose the "smallest common input" for tiers.
+    # In the example: 1900_till_2400:8.7:¢/kWh:Weekday and 0000_till_2000:8.7:¢/kWh:Weekend
+    # 1900-2000 is common to both.
+    # Since we are plotting an Average profile (over all days), 
+    # we'll determine the tier for each hour by checking both weekday and weekend.
+    # If they differ, we can pick the one that is more frequent or follow a specific rule.
+    # The prompt says: "divide tiers based on smallest common input".
+    # This suggests we should look at the transitions in both weekday and weekend schedules.
+    
+    tier_schedule = []
+    for h in range(24):
+        wd_rate = weekday_rates.get(h)
+        we_rate = weekend_rates.get(h)
+        
+        # For the purpose of the Ampere Stats graph (which is an average), 
+        # we need a single tier name per hour. 
+        # If they are different, we'll label it based on the weekday rate as it's more common,
+        # OR we could just follow the TieredRates.txt rules.
+        # Actually, "smallest common input" might mean splitting the x-axis where ANY tier changes.
+        
+        tier = get_tier_name(wd_rate) # Default to weekday for the profile
+        tier_schedule.append(tier)
+
     hourly_df['tier'] = hourly_df['rate_cents'].apply(get_tier_name)
     tier_usage = hourly_df.groupby('tier')['usage_kwh'].sum()
     tier_cost_cents = hourly_df.groupby('tier')['cost_cents'].sum()
@@ -211,14 +235,40 @@ plt.close()
 
 # Graph 4: Ampere Stats Profile (Min, Max, Avg)
 plt.figure(figsize=(12, 6))
-plt.plot(amp_stats.index, amp_stats['mean'], label='Average Amps', color='blue', marker='o', linewidth=2)
-plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='blue', alpha=0.2, label='Min-Max Range')
+
+# Plot the stats
+plt.plot(amp_stats.index, amp_stats['mean'], label='Average Amps', color='black', marker='o', linewidth=2, zorder=3)
+plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='gray', alpha=0.3, label='Min-Max Range', zorder=2)
+
+# Add background colors for tiers if available
+if has_rates:
+    tier_colors = {'On-Peak': '#ff9999', 'Mid-Peak': '#ffcc99', 'Off-Peak': '#99ff99', 'Other': '#f0f0f0'}
+    
+    # We want to draw vertical spans for each hour's tier
+    for h in range(24):
+        tier = tier_schedule[h]
+        color = tier_colors.get(tier, '#f0f0f0')
+        plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.4, zorder=1)
+        
+    # Create custom legend for tiers
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Patch(facecolor=tier_colors['On-Peak'], alpha=0.4, label='On-Peak (Weekday)'),
+        Patch(facecolor=tier_colors['Mid-Peak'], alpha=0.4, label='Mid-Peak (Weekday)'),
+        Patch(facecolor=tier_colors['Off-Peak'], alpha=0.4, label='Off-Peak (Weekday)'),
+        Line2D([0], [0], color='black', marker='o', label='Average Amps'),
+        Patch(facecolor='gray', alpha=0.3, label='Min-Max Range')
+    ]
+    plt.legend(handles=legend_elements, loc='upper left')
+else:
+    plt.legend()
+
 plt.title(f'Hourly Ampere Profile (at 120V) - Local Time ({tz_name})')
 plt.xlabel(f'Hour of Day (24h) - Local Time ({tz_name})')
 plt.ylabel('Current (Amperes)')
 plt.xticks(range(0, 24))
-plt.legend()
-plt.grid(True, linestyle='--', alpha=0.5)
+plt.grid(True, linestyle='--', alpha=0.5, zorder=0)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph4_ampere_stats.png'))
 plt.close()

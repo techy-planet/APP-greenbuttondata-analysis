@@ -41,7 +41,7 @@ The script creates an `output/` directory and saves the generated plots and data
 - `graph1_hourly_timeseries.png`
 - `graph2_avg_hourly_profile.png`
 - `graph3_daily_usage.png`
-- `graph4_ampere_stats.png`
+- `graph4_ampere_stats.png` (Estimated Ampere stats with background colored by rate tiers)
 - `graph5_avg_cost_profile.png` (Average cost profile using tiered rates - only if `TieredRates.txt` is available)
 - `graph6_daily_cost.png` (Total daily cost in ¢ - only if `TieredRates.txt` is available)
 - `graph7_tier_distribution.png` (Usage and cost split by peak tiers - only if `TieredRates.txt` is available)
