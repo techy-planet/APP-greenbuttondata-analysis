@@ -50,7 +50,7 @@ The script creates an `output/` directory and saves the generated plots and data
 
 ## Features
 
-- **Tiered Rate Analysis**: Automatically reads `TieredRates.txt` (if available) to calculate costs based on time-of-use (Off-Peak, Mid-Peak, On-Peak) for both weekdays and weekends. All cost visualizations use ¢ as the unit.
+- **Tiered Rate Analysis**: Automatically reads `TieredRates.txt` (if available) to calculate costs. The file structure should include a `tier_name` column (e.g., `time_range:charge per kwh:currency to display:day type:tier_name`). All cost visualizations use ¢ as the unit and dynamically apply colors based on the defined tiers.
 - **Dynamic Timezone**: Detects and applies system timezone to all data and labels.
 - **Advanced Visualizations**: Includes heatmaps and distribution charts for deeper insights into energy consumption patterns.
 

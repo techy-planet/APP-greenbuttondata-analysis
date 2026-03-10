@@ -59,8 +59,11 @@ df = pd.DataFrame(data)
 
 # 2.5 Load Tiered Rates
 rates_file = 'TieredRates.txt'
-weekday_rates = {}
-weekend_rates = {}
+weekday_rates = {} # hour -> charge
+weekend_rates = {} # hour -> charge
+weekday_tier_names = {} # hour -> tier_name
+weekend_tier_names = {} # hour -> tier_name
+tier_names_list = [] # ordered list of tier names for color mapping
 
 if os.path.exists(rates_file):
     print(f"Loading rates from {rates_file}...")
@@ -70,30 +73,39 @@ if os.path.exists(rates_file):
         # Clean up column names in case they have leading/trailing spaces
         rates_df.columns = rates_df.columns.str.strip()
         
+        # Collect unique tier names in order of appearance
+        if 'tier_name' in rates_df.columns:
+            for t in rates_df['tier_name'].str.strip():
+                if t not in tier_names_list:
+                    tier_names_list.append(t)
+        
         for _, row in rates_df.iterrows():
             time_range = str(row['time_range']).strip()
             charge = float(row['charge per kwh'])
             day_type = str(row['day type']).strip()
+            tier_name = str(row['tier_name']).strip() if 'tier_name' in row else "Other"
             
             start_hour = int(time_range.split('_')[0][:2])
             end_hour = int(time_range.split('_')[2][:2])
             if end_hour == 0: end_hour = 24 # 2400 case
             
             rate_dict = weekday_rates if day_type == 'Weekday' else weekend_rates
+            name_dict = weekday_tier_names if day_type == 'Weekday' else weekend_tier_names
             for h in range(start_hour, end_hour):
                 rate_dict[h] = charge
+                name_dict[h] = tier_name
     except Exception as e:
         print(f"Error parsing {rates_file}: {e}")
 else:
     print(f"Warning: {rates_file} not found. Cost analysis will be skipped.")
 
-def get_rate(row):
+def get_rate_info(row):
     dt = row['dt_local']
     hour = dt.hour
     if dt.weekday() < 5: # Monday-Friday
-        return weekday_rates.get(hour, 0)
+        return weekday_rates.get(hour, 0.0), weekday_tier_names.get(hour, "Other")
     else: # Saturday-Sunday
-        return weekend_rates.get(hour, 0)
+        return weekend_rates.get(hour, 0.0), weekend_tier_names.get(hour, "Other")
 
 # 3. Data Transformation
 # Get multiplier from ReadingType (e.g., -3 for Wh)
@@ -120,11 +132,15 @@ voltage = 120
 df['amps'] = (df['usage_kwh'] * 1000) / voltage
 
 # Apply Rate and Calculate Cost (¢)
-if weekday_rates and weekend_rates:
-    df['rate_cents'] = df.apply(get_rate, axis=1)
+has_rates = bool(weekday_rates and weekend_rates)
+if has_rates:
+    rate_info = df.apply(get_rate_info, axis=1)
+    df['rate_cents'] = rate_info.apply(lambda x: x[0])
+    df['tier'] = rate_info.apply(lambda x: x[1])
     df['cost_cents'] = df['usage_kwh'] * df['rate_cents']
 else:
     df['rate_cents'] = 0.0
+    df['tier'] = 'Other'
     df['cost_cents'] = 0.0
 
 # 4. Filter for Hourly Data and Sort
@@ -149,38 +165,18 @@ if has_rates:
     avg_cost_profile = hourly_df.groupby('hour')['cost_cents'].mean()
     daily_cost_cents = hourly_df.set_index('dt_local').resample('D')['cost_cents'].sum()
     
-    # Rate Tier distribution
-    def get_tier_name(rate):
-        if rate == 18.2: return 'On-Peak'
-        if rate == 12.2: return 'Mid-Peak'
-        if rate == 8.7: return 'Off-Peak'
-        return 'Other'
+    # Dynamic tier mapping for colors
+    # Use a vibrant palette (Set2 or Pastel1)
+    colors = sns.color_palette("Set2", len(tier_names_list))
+    tier_colors = {name: color for name, color in zip(tier_names_list, colors)}
+    tier_colors['Other'] = '#f0f0f0'
 
     # Mapping for Graph 4 background coloring
-    # We choose the "smallest common input" for tiers.
-    # In the example: 1900_till_2400:8.7:¢/kWh:Weekday and 0000_till_2000:8.7:¢/kWh:Weekend
-    # 1900-2000 is common to both.
-    # Since we are plotting an Average profile (over all days), 
-    # we'll determine the tier for each hour by checking both weekday and weekend.
-    # If they differ, we can pick the one that is more frequent or follow a specific rule.
-    # The prompt says: "divide tiers based on smallest common input".
-    # This suggests we should look at the transitions in both weekday and weekend schedules.
-    
     tier_schedule = []
     for h in range(24):
-        wd_rate = weekday_rates.get(h)
-        we_rate = weekend_rates.get(h)
-        
-        # For the purpose of the Ampere Stats graph (which is an average), 
-        # we need a single tier name per hour. 
-        # If they are different, we'll label it based on the weekday rate as it's more common,
-        # OR we could just follow the TieredRates.txt rules.
-        # Actually, "smallest common input" might mean splitting the x-axis where ANY tier changes.
-        
-        tier = get_tier_name(wd_rate) # Default to weekday for the profile
-        tier_schedule.append(tier)
+        # Default to weekday for the profile
+        tier_schedule.append(weekday_tier_names.get(h, "Other"))
 
-    hourly_df['tier'] = hourly_df['rate_cents'].apply(get_tier_name)
     tier_usage = hourly_df.groupby('tier')['usage_kwh'].sum()
     tier_cost_cents = hourly_df.groupby('tier')['cost_cents'].sum()
 
@@ -242,8 +238,6 @@ plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='gra
 
 # Add background colors for tiers if available
 if has_rates:
-    tier_colors = {'On-Peak': '#ff9999', 'Mid-Peak': '#ffcc99', 'Off-Peak': '#99ff99', 'Other': '#f0f0f0'}
-    
     # We want to draw vertical spans for each hour's tier
     for h in range(24):
         tier = tier_schedule[h]
@@ -254,12 +248,13 @@ if has_rates:
     from matplotlib.patches import Patch
     from matplotlib.lines import Line2D
     legend_elements = [
-        Patch(facecolor=tier_colors['On-Peak'], alpha=0.4, label='On-Peak (Weekday)'),
-        Patch(facecolor=tier_colors['Mid-Peak'], alpha=0.4, label='Mid-Peak (Weekday)'),
-        Patch(facecolor=tier_colors['Off-Peak'], alpha=0.4, label='Off-Peak (Weekday)'),
+        Patch(facecolor=tier_colors.get(name), alpha=0.4, label=f'{name} (Weekday)')
+        for name in tier_names_list
+    ]
+    legend_elements.extend([
         Line2D([0], [0], color='black', marker='o', label='Average Amps'),
         Patch(facecolor='gray', alpha=0.3, label='Min-Max Range')
-    ]
+    ])
     plt.legend(handles=legend_elements, loc='upper left')
 else:
     plt.legend()
@@ -301,11 +296,14 @@ if has_rates:
     # Graph 7: Usage and Cost by Rate Tier
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    tier_usage.plot(kind='pie', autopct='%1.1f%%', ax=ax1, colors=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
+    # Get colors for existing tiers in this dataset
+    pie_colors1 = [tier_colors.get(t, '#f0f0f0') for t in tier_usage.index]
+    tier_usage.plot(kind='pie', autopct='%1.1f%%', ax=ax1, colors=pie_colors1)
     ax1.set_title('Usage (kWh) by Rate Tier')
     ax1.set_ylabel('')
 
-    tier_cost_cents.plot(kind='pie', autopct='%1.1f%%', ax=ax2, colors=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
+    pie_colors2 = [tier_colors.get(t, '#f0f0f0') for t in tier_cost_cents.index]
+    tier_cost_cents.plot(kind='pie', autopct='%1.1f%%', ax=ax2, colors=pie_colors2)
     ax2.set_title('Cost (¢) by Rate Tier')
     ax2.set_ylabel('')
 
