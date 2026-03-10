@@ -98,3 +98,7 @@ If available, the tool reads `TieredRates.txt` to calculate costs and color-code
 
 Example:
 `0700_till_1100:18.2:¢/kWh:Weekday:On-Peak:#ffaaa5`
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
