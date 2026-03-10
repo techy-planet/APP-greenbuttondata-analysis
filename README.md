@@ -42,7 +42,17 @@ The script creates an `output/` directory and saves the generated plots and data
 - `graph2_avg_hourly_profile.png`
 - `graph3_daily_usage.png`
 - `graph4_ampere_stats.png`
-- `hourly_data_points.csv` (all hourly data points in local time)
+- `graph5_avg_cost_profile.png` (Average cost profile using tiered rates - only if `TieredRates.txt` is available)
+- `graph6_daily_cost.png` (Total daily cost in ¢ - only if `TieredRates.txt` is available)
+- `graph7_tier_distribution.png` (Usage and cost split by peak tiers - only if `TieredRates.txt` is available)
+- `graph8_usage_heatmap.png` (Heatmap of hourly usage by day - only if `TieredRates.txt` is available)
+- `hourly_data_points.csv` (Detailed hourly data including rates and costs)
+
+## Features
+
+- **Tiered Rate Analysis**: Automatically reads `TieredRates.txt` (if available) to calculate costs based on time-of-use (Off-Peak, Mid-Peak, On-Peak) for both weekdays and weekends. All cost visualizations use ¢ as the unit.
+- **Dynamic Timezone**: Detects and applies system timezone to all data and labels.
+- **Advanced Visualizations**: Includes heatmaps and distribution charts for deeper insights into energy consumption patterns.
 
 ## Requirements
 

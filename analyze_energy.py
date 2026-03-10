@@ -1,10 +1,14 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os
 import glob
 import time
 from datetime import datetime, timedelta
+
+# Set seaborn style for better aesthetics
+sns.set_theme(style="whitegrid")
 
 # 1. Choose XML File
 xml_files = glob.glob('*.xml')
@@ -53,6 +57,44 @@ for block in root.findall('.//espi:IntervalBlock', ns):
 
 df = pd.DataFrame(data)
 
+# 2.5 Load Tiered Rates
+rates_file = 'TieredRates.txt'
+weekday_rates = {}
+weekend_rates = {}
+
+if os.path.exists(rates_file):
+    print(f"Loading rates from {rates_file}...")
+    try:
+        # Use skipinitialspace=True in case there are leading spaces after the colon
+        rates_df = pd.read_csv(rates_file, sep=':')
+        # Clean up column names in case they have leading/trailing spaces
+        rates_df.columns = rates_df.columns.str.strip()
+        
+        for _, row in rates_df.iterrows():
+            time_range = str(row['time_range']).strip()
+            charge = float(row['charge per kwh'])
+            day_type = str(row['day type']).strip()
+            
+            start_hour = int(time_range.split('_')[0][:2])
+            end_hour = int(time_range.split('_')[2][:2])
+            if end_hour == 0: end_hour = 24 # 2400 case
+            
+            rate_dict = weekday_rates if day_type == 'Weekday' else weekend_rates
+            for h in range(start_hour, end_hour):
+                rate_dict[h] = charge
+    except Exception as e:
+        print(f"Error parsing {rates_file}: {e}")
+else:
+    print(f"Warning: {rates_file} not found. Cost analysis will be skipped.")
+
+def get_rate(row):
+    dt = row['dt_local']
+    hour = dt.hour
+    if dt.weekday() < 5: # Monday-Friday
+        return weekday_rates.get(hour, 0)
+    else: # Saturday-Sunday
+        return weekend_rates.get(hour, 0)
+
 # 3. Data Transformation
 # Get multiplier from ReadingType (e.g., -3 for Wh)
 reading_type = root.find('.//espi:ReadingType', ns)
@@ -77,6 +119,14 @@ df['dt_local'] = df['dt_utc'] + timedelta(seconds=tz_offset_seconds)
 voltage = 120
 df['amps'] = (df['usage_kwh'] * 1000) / voltage
 
+# Apply Rate and Calculate Cost (¢)
+if weekday_rates and weekend_rates:
+    df['rate_cents'] = df.apply(get_rate, axis=1)
+    df['cost_cents'] = df['usage_kwh'] * df['rate_cents']
+else:
+    df['rate_cents'] = 0.0
+    df['cost_cents'] = 0.0
+
 # 4. Filter for Hourly Data and Sort
 # We filter for duration=3600 to ignore daily summaries or partial reads
 hourly_df = df[df['duration'] == 3600].copy()
@@ -92,10 +142,28 @@ amp_stats = hourly_df.groupby('hour')['amps'].agg(['min', 'max', 'mean'])
 # Daily totals
 daily_usage = hourly_df.set_index('dt_local').resample('D')['usage_kwh'].sum()
 
+# Conditional Cost Analysis
+has_rates = bool(weekday_rates and weekend_rates)
+
+if has_rates:
+    avg_cost_profile = hourly_df.groupby('hour')['cost_cents'].mean()
+    daily_cost_cents = hourly_df.set_index('dt_local').resample('D')['cost_cents'].sum()
+    
+    # Rate Tier distribution
+    def get_tier_name(rate):
+        if rate == 18.2: return 'On-Peak'
+        if rate == 12.2: return 'Mid-Peak'
+        if rate == 8.7: return 'Off-Peak'
+        return 'Other'
+
+    hourly_df['tier'] = hourly_df['rate_cents'].apply(get_tier_name)
+    tier_usage = hourly_df.groupby('tier')['usage_kwh'].sum()
+    tier_cost_cents = hourly_df.groupby('tier')['cost_cents'].sum()
+
 # --- SAVING DATA ---
 # Select and rename columns for clarity
-csv_df = hourly_df[['dt_local', 'usage_kwh', 'amps']].copy()
-csv_df.columns = [f'Local Time ({tz_name})', 'Usage (kWh)', 'Current (Amps)']
+csv_df = hourly_df[['dt_local', 'usage_kwh', 'amps', 'rate_cents', 'cost_cents']].copy()
+csv_df.columns = [f'Local Time ({tz_name})', 'Usage (kWh)', 'Current (Amps)', 'Rate (¢/kWh)', 'Cost (¢)']
 
 # Save to CSV
 csv_filename = 'hourly_data_points.csv'
@@ -154,5 +222,56 @@ plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph4_ampere_stats.png'))
 plt.close()
+
+if has_rates:
+    # Graph 5: Average Cost Profile by Hour
+    plt.figure(figsize=(10, 5))
+    plt.plot(avg_cost_profile.index, avg_cost_profile.values, marker='s', color='tab:red')
+    plt.title(f'Average Electricity Cost by Hour of Day ({tz_name})')
+    plt.xlabel(f'Hour of Day (24h) - {tz_name}')
+    plt.ylabel('Average Cost (¢)')
+    plt.xticks(range(0, 24))
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'graph5_avg_cost_profile.png'))
+    plt.close()
+
+    # Graph 6: Daily Total Cost
+    plt.figure(figsize=(12, 5))
+    daily_cost_cents.plot(kind='bar', color='tab:red')
+    plt.title(f'Daily Electricity Cost Total ({tz_name})')
+    plt.xlabel(f'Date ({tz_name})')
+    plt.ylabel('Total Daily Cost (¢)')
+    plt.xticks(rotation=45)
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'graph6_daily_cost.png'))
+    plt.close()
+
+    # Graph 7: Usage and Cost by Rate Tier
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    tier_usage.plot(kind='pie', autopct='%1.1f%%', ax=ax1, colors=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
+    ax1.set_title('Usage (kWh) by Rate Tier')
+    ax1.set_ylabel('')
+
+    tier_cost_cents.plot(kind='pie', autopct='%1.1f%%', ax=ax2, colors=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
+    ax2.set_title('Cost (¢) by Rate Tier')
+    ax2.set_ylabel('')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'graph7_tier_distribution.png'))
+    plt.close()
+
+    # Graph 8: Heatmap of Usage by Day and Hour
+    pivot_df = hourly_df.pivot_table(index=hourly_df['dt_local'].dt.date, columns='hour', values='usage_kwh')
+    plt.figure(figsize=(16, 8))
+    sns.heatmap(pivot_df, cmap='YlOrRd', annot=False)
+    plt.title(f'Heatmap of Hourly Usage (kWh) - {tz_name}')
+    plt.xlabel(f'Hour of Day ({tz_name})')
+    plt.ylabel('Date')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'graph8_usage_heatmap.png'))
+    plt.close()
 
 print(f"Processing complete. Graphs and CSV saved in: {output_dir}")
