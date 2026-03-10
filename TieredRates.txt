@@ -1,0 +1,7 @@
+time_range:charge per kwh:currency to display:day type
+0000_till_0700:8.7:¢/kWh:Weekday
+0700_till_1100:18.2:¢/kWh:Weekday
+1100_till_1700:12.2:¢/kWh:Weekday
+1700_till_1900:18.2:¢/kWh:Weekday
+1900_till_2400:8.7:¢/kWh:Weekday
+0000_till_2400:8.7:¢/kWh:Weekend
