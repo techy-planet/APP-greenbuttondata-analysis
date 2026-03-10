@@ -37,11 +37,12 @@ You can use the provided `run.sh` script to launch the analysis with different m
 
 ## Output
 
-The script creates an `output/` directory and saves the generated plots within a timestamped subfolder named after the analyzed XML file (e.g., `output/20260309_233516_Elexicon_Electricity_...xml/`):
+The script creates an `output/` directory and saves the generated plots and data within a timestamped subfolder named after the analyzed XML file (e.g., `output/20260309_233516_Elexicon_Electricity_...xml/`):
 - `graph1_hourly_timeseries.png`
 - `graph2_avg_hourly_profile.png`
 - `graph3_daily_usage.png`
 - `graph4_ampere_stats.png`
+- `hourly_data_points.csv` (all hourly data points in local time)
 
 ## Requirements
 

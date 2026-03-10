@@ -92,6 +92,18 @@ amp_stats = hourly_df.groupby('hour')['amps'].agg(['min', 'max', 'mean'])
 # Daily totals
 daily_usage = hourly_df.set_index('dt_local').resample('D')['usage_kwh'].sum()
 
+# --- SAVING DATA ---
+# Select and rename columns for clarity
+csv_df = hourly_df[['dt_local', 'usage_kwh', 'amps']].copy()
+csv_df.columns = [f'Local Time ({tz_name})', 'Usage (kWh)', 'Current (Amps)']
+
+# Save to CSV
+csv_filename = 'hourly_data_points.csv'
+csv_path = os.path.join(output_dir, csv_filename)
+csv_df.to_csv(csv_path, index=False, date_format='%Y-%m-%d %H:%M:%S')
+
+print(f"Data points saved to: {csv_path}")
+
 # --- PLOTTING ---
 
 # Graph 1: Hourly Time Series
@@ -143,4 +155,4 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_dir, 'graph4_ampere_stats.png'))
 plt.close()
 
-print(f"Processing complete. Graphs saved in: {output_dir}")
+print(f"Processing complete. Graphs and CSV saved in: {output_dir}")
