@@ -27,7 +27,7 @@ Simply run the provided `run.sh` script to launch the interactive analysis tool.
 The tool will:
 1. Clear the console and show a colorful interface.
 2. Automatically detect `.xml` files. If multiple are found, you'll be prompted to choose one.
-3. Show the available date range in the data and allow you to optionally filter it.
+3. Show the available date range and the last used date range (if any), allowing you to optionally filter it or reuse the last range by pressing 'L'.
 4. Detect your system timezone and apply it to all graphs and data points.
 5. Generate up to 8 different visualizations and a detailed CSV file.
 

@@ -169,11 +169,34 @@ print_header("Date Range Selection")
 available_start = df['dt_local'].min()
 available_end = df['dt_local'].max()
 
+# Look for last run dates in output folder
+last_start_str = ""
+last_end_str = ""
+output_base = "output"
+if os.path.exists(output_base):
+    subfolders = sorted([f for f in os.listdir(output_base) if os.path.isdir(os.path.join(output_base, f))], reverse=True)
+    for folder in subfolders:
+        # Pattern: yyyyMMdd_HHmmss_YYYY-MM-DD_to_YYYY-MM-DD
+        parts = folder.split('_')
+        if len(parts) >= 5 and parts[3] == 'to':
+            last_start_str = parts[2]
+            last_end_str = parts[4]
+            break
+
 print(f"Available range: {C_YELLOW}{available_start}{C_RESET} to {C_YELLOW}{available_end}{C_RESET}")
+if last_start_str and last_end_str:
+    print(f"Last used range: {C_BOLD}{C_GREEN}{last_start_str}{C_RESET} to {C_BOLD}{C_GREEN}{last_end_str}{C_RESET} (Press {C_BOLD}'L'{C_RESET} to reuse)")
+
 print(f"Press {C_BOLD}Enter{C_RESET} to keep default or provide new range below.")
 
 user_start = input(f"Start Date (format: YYYY-MM-DD) [{available_start.date()}]: ").strip()
-user_end = input(f"End Date   (format: YYYY-MM-DD) [{available_end.date()}]: ").strip()
+
+if user_start.lower() == 'l' and last_start_str and last_end_str:
+    user_start = last_start_str
+    user_end = last_end_str
+    print_info(f"Reusing last range: {user_start} to {user_end}")
+else:
+    user_end = input(f"End Date   (format: YYYY-MM-DD) [{available_end.date()}]: ").strip()
 
 if user_start:
     try:
