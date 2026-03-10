@@ -5,30 +5,69 @@ import seaborn as sns
 import os
 import glob
 import time
+import sys
 from datetime import datetime, timedelta
+
+# ANSI Colors
+C_RESET = "\033[0m"
+C_BOLD = "\033[1m"
+C_GREEN = "\033[32m"
+C_CYAN = "\033[36m"
+C_YELLOW = "\033[33m"
+C_RED = "\033[31m"
+C_MAGENTA = "\033[35m"
+
+def clear_console():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_header(text):
+    print(f"\n{C_BOLD}{C_CYAN}{'='*10} {text} {'='*10}{C_RESET}")
+
+def print_success(text):
+    print(f"{C_GREEN}✓ {text}{C_RESET}")
+
+def print_warning(text):
+    print(f"{C_YELLOW}! {text}{C_RESET}")
+
+def print_error(text):
+    print(f"{C_RED}✗ {text}{C_RESET}")
+
+def print_info(text):
+    print(f"{C_MAGENTA}ℹ {text}{C_RESET}")
+
+# Clear console at start
+clear_console()
+print_header("Green Button Energy Analysis")
 
 # Set seaborn style for better aesthetics
 sns.set_theme(style="whitegrid")
 
 # 1. Choose XML File
-xml_files = glob.glob('*.xml')
+xml_files = sorted(glob.glob('*.xml'))
 if not xml_files:
-    print("No XML files found in current directory.")
+    print_error("No XML files found in current directory.")
     exit(1)
 
 if len(xml_files) == 1:
     filename = xml_files[0]
+    print_success(f"Automatically selected: {C_BOLD}{filename}{C_RESET}")
 else:
-    print("Multiple XML files found:")
+    print(f"{C_BOLD}Multiple XML files found:{C_RESET}")
     for i, f in enumerate(xml_files):
-        print(f"{chr(ord('a') + i)}) {f}")
-    choice = input("Select a file (a, b, c, ...): ").strip().lower()
-    idx = ord(choice) - ord('a')
-    if 0 <= idx < len(xml_files):
-        filename = xml_files[idx]
-    else:
-        print("Invalid choice. Exiting.")
-        exit(1)
+        print(f"  {C_YELLOW}{chr(ord('a') + i)}){C_RESET} {f}")
+    
+    while True:
+        choice = input(f"\nSelect a file ({C_YELLOW}a, b, c, ...{C_RESET}): ").strip().lower()
+        if not choice:
+            filename = xml_files[0]
+            print_info(f"Using default: {filename}")
+            break
+        idx = ord(choice) - ord('a')
+        if 0 <= idx < len(xml_files):
+            filename = xml_files[idx]
+            break
+        else:
+            print_error("Invalid choice. Please try again.")
 
 # Create output folder
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -37,8 +76,8 @@ folder_name = f"{timestamp}_{os.path.basename(filename)}"
 output_dir = os.path.join(output_base, folder_name)
 os.makedirs(output_dir, exist_ok=True)
 
-print(f"Analyzing {filename}...")
-print(f"Results will be saved in: {output_dir}")
+print_info(f"Analyzing {C_BOLD}{filename}{C_RESET}...")
+print_info(f"Results will be saved in: {C_BOLD}{output_dir}{C_RESET}")
 
 ns = {'espi': 'http://naesb.org/espi', 'atom': 'http://www.w3.org/2005/Atom'}
 
@@ -67,7 +106,7 @@ tier_colors = {} # tier_name -> color_code
 tier_names_list = [] # ordered list of tier names for color mapping
 
 if os.path.exists(rates_file):
-    print(f"Loading rates from {rates_file}...")
+    print_info(f"Loading rates from {C_BOLD}{rates_file}{C_RESET}...")
     try:
         # Use skipinitialspace=True in case there are leading spaces after the colon
         rates_df = pd.read_csv(rates_file, sep=':')
@@ -101,9 +140,9 @@ if os.path.exists(rates_file):
                 rate_dict[h] = charge
                 name_dict[h] = tier_name
     except Exception as e:
-        print(f"Error parsing {rates_file}: {e}")
+        print_error(f"Error parsing {rates_file}: {e}")
 else:
-    print(f"Warning: {rates_file} not found. Cost analysis will be skipped.")
+    print_warning(f"{rates_file} not found. Cost analysis will be skipped.")
 
 def get_rate_info(row):
     dt = row['dt_local']
@@ -124,7 +163,7 @@ local_now = datetime.now().astimezone()
 tz_name = local_now.tzname()
 tz_offset_seconds = local_now.utcoffset().total_seconds()
 
-print(f"Detected System Timezone: {tz_name} (Offset: {tz_offset_seconds/3600:g}h)")
+print_info(f"Detected System Timezone: {C_BOLD}{tz_name}{C_RESET} (Offset: {tz_offset_seconds/3600:g}h)")
 
 # Convert to kWh
 df['usage_kwh'] = (df['value'] * (10 ** multiplier)) / 1000.0
@@ -132,6 +171,39 @@ df['usage_kwh'] = (df['value'] * (10 ** multiplier)) / 1000.0
 # Convert Timestamps to Local Time
 df['dt_utc'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
 df['dt_local'] = df['dt_utc'] + timedelta(seconds=tz_offset_seconds)
+
+# --- DATE RANGE SELECTION ---
+print_header("Date Range Selection")
+available_start = df['dt_local'].min()
+available_end = df['dt_local'].max()
+
+print(f"Available range: {C_YELLOW}{available_start}{C_RESET} to {C_YELLOW}{available_end}{C_RESET}")
+print(f"Press {C_BOLD}Enter{C_RESET} to keep default or provide new range below.")
+
+user_start = input(f"Start Date (format: YYYY-MM-DD) [{available_start.date()}]: ").strip()
+user_end = input(f"End Date   (format: YYYY-MM-DD) [{available_end.date()}]: ").strip()
+
+if user_start:
+    try:
+        # Use .replace(hour=0, minute=0, second=0) implicitly by pd.to_datetime
+        available_start = pd.to_datetime(user_start).tz_localize(df['dt_local'].dt.tz)
+    except Exception as e:
+        print_error(f"Invalid start date format: {e}. Using default.")
+
+if user_end:
+    try:
+        # Use .replace(hour=23, minute=59, second=59) for end date
+        available_end = pd.to_datetime(user_end).replace(hour=23, minute=59, second=59).tz_localize(df['dt_local'].dt.tz)
+    except Exception as e:
+        print_error(f"Invalid end date format: {e}. Using default.")
+
+# Apply filter
+df = df[(df['dt_local'] >= available_start) & (df['dt_local'] <= available_end)].copy()
+if df.empty:
+    print_error("No data found in the selected range! Exiting.")
+    exit(1)
+
+print_success(f"Analyzing data from {C_BOLD}{available_start}{C_RESET} to {C_BOLD}{available_end}{C_RESET}")
 
 # Calculate Amperes (Assuming 120V residential supply)
 voltage = 120
@@ -194,9 +266,10 @@ csv_filename = 'hourly_data_points.csv'
 csv_path = os.path.join(output_dir, csv_filename)
 csv_df.to_csv(csv_path, index=False, date_format='%Y-%m-%d %H:%M:%S')
 
-print(f"Data points saved to: {csv_path}")
+print_success(f"Data points saved to: {C_BOLD}{csv_path}{C_RESET}")
 
 # --- PLOTTING ---
+print_info("Generating graphs...")
 
 # Graph 1: Hourly Time Series
 plt.figure(figsize=(15, 6))
@@ -413,4 +486,5 @@ if has_rates:
     plt.savefig(os.path.join(output_dir, 'graph8_usage_heatmap.png'))
     plt.close()
 
-print(f"Processing complete. Graphs and CSV saved in: {output_dir}")
+print_header("Processing Complete")
+print_success(f"Graphs and CSV saved in: {C_BOLD}{output_dir}{C_RESET}")
