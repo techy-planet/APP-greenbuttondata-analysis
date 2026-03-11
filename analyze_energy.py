@@ -1,12 +1,11 @@
-import xml.etree.ElementTree as ET
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
 import glob
-import time
-import sys
+import os
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 # ANSI Colors
 C_RESET = "\033[0m"
@@ -17,23 +16,30 @@ C_YELLOW = "\033[33m"
 C_RED = "\033[31m"
 C_MAGENTA = "\033[35m"
 
+
 def clear_console():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+
 def print_header(text):
-    print(f"\n{C_BOLD}{C_CYAN}{'='*10} {text} {'='*10}{C_RESET}")
+    print(f"\n{C_BOLD}{C_CYAN}{'=' * 10} {text} {'=' * 10}{C_RESET}")
+
 
 def print_success(text):
     print(f"{C_GREEN}✓ {text}{C_RESET}")
 
+
 def print_warning(text):
     print(f"{C_YELLOW}! {text}{C_RESET}")
+
 
 def print_error(text):
     print(f"{C_RED}✗ {text}{C_RESET}")
 
+
 def print_info(text):
     print(f"{C_MAGENTA}ℹ {text}{C_RESET}")
+
 
 # Clear console at start
 clear_console()
@@ -55,7 +61,7 @@ else:
     print(f"{C_BOLD}Multiple XML files found:{C_RESET}")
     for i, f in enumerate(xml_files):
         print(f"  {C_YELLOW}{chr(ord('a') + i)}){C_RESET} {f}")
-    
+
     while True:
         choice = input(f"\nSelect a file ({C_YELLOW}a, b, c, ...{C_RESET}): ").strip().lower()
         if not choice:
@@ -90,10 +96,10 @@ df = pd.DataFrame(data)
 
 # 2.5 Load Tiered Rates
 rates_file = 'TieredRates.txt'
-weekday_rates = {} # hour -> charge
-weekend_rates = {} # hour -> charge
-weekday_tier_names = {} # hour -> tier_name
-weekend_tier_names = {} # hour -> tier_name
+weekday_rates = {}  # hour -> charge
+weekend_rates = {}  # hour -> charge
+weekday_tier_names = {}  # hour -> tier_name
+weekend_tier_names = {}  # hour -> tier_name
 
 # Default colors (eye-soothing palette)
 DEFAULT_COLORS = {
@@ -103,7 +109,8 @@ DEFAULT_COLORS = {
     'Other': '#ff4d4d'
 }
 tier_colors = DEFAULT_COLORS.copy()
-tier_names_list = [] # ordered list of tier names for color mapping
+tier_names_list = []  # ordered list of tier names for color mapping
+
 
 # Default Tier Logic (used when TieredRates.txt is missing)
 def get_default_tier(hour):
@@ -112,6 +119,7 @@ def get_default_tier(hour):
         return 'Off-Peak'
     return 'Other'
 
+
 if os.path.exists(rates_file):
     print_info(f"Loading rates from {C_BOLD}{rates_file}{C_RESET}...")
     try:
@@ -119,28 +127,28 @@ if os.path.exists(rates_file):
         rates_df = pd.read_csv(rates_file, sep=':')
         # Clean up column names in case they have leading/trailing spaces
         rates_df.columns = rates_df.columns.str.strip()
-        
+
         # Collect unique tier names in order of appearance
         if 'tier_name' in rates_df.columns:
             for t in rates_df['tier_name'].str.strip():
                 if t not in tier_names_list:
                     tier_names_list.append(t)
-        
+
         for _, row in rates_df.iterrows():
             time_range = str(row['time_range']).strip()
             charge = float(row['charge_per_kwh'])
             day_type = str(row['day_type']).strip()
             tier_name = str(row['tier_name']).strip() if 'tier_name' in row else "Other"
             color_code = str(row['color_code']).strip() if 'color_code' in row else "#f0f0f0"
-            
+
             if tier_name not in tier_names_list:
                 tier_names_list.append(tier_name)
             tier_colors[tier_name] = color_code
-            
+
             start_hour = int(time_range.split('_')[0][:2])
             end_hour = int(time_range.split('_')[2][:2])
-            if end_hour == 0: end_hour = 24 # 2400 case
-            
+            if end_hour == 0: end_hour = 24  # 2400 case
+
             rate_dict = weekday_rates if day_type == 'Weekday' else weekend_rates
             name_dict = weekday_tier_names if day_type == 'Weekday' else weekend_tier_names
             for h in range(start_hour, end_hour):
@@ -151,13 +159,15 @@ if os.path.exists(rates_file):
 else:
     print_warning(f"{rates_file} not found. Cost analysis will be skipped.")
 
+
 def get_rate_info(row):
     dt = row['dt_local']
     hour = dt.hour
-    if dt.weekday() < 5: # Monday-Friday
+    if dt.weekday() < 5:  # Monday-Friday
         return weekday_rates.get(hour, 0.0), weekday_tier_names.get(hour, "Other")
-    else: # Saturday-Sunday
+    else:  # Saturday-Sunday
         return weekend_rates.get(hour, 0.0), weekend_tier_names.get(hour, "Other")
+
 
 # 3. Data Transformation
 # Get multiplier from ReadingType (e.g., -3 for Wh)
@@ -170,7 +180,7 @@ local_now = datetime.now().astimezone()
 tz_name = local_now.tzname()
 tz_offset_seconds = local_now.utcoffset().total_seconds()
 
-print_info(f"Detected System Timezone: {C_BOLD}{tz_name}{C_RESET} (Offset: {tz_offset_seconds/3600:g}h)")
+print_info(f"Detected System Timezone: {C_BOLD}{tz_name}{C_RESET} (Offset: {tz_offset_seconds / 3600:g}h)")
 
 # Convert to kWh
 df['usage_kwh'] = (df['value'] * (10 ** multiplier)) / 1000.0
@@ -189,7 +199,8 @@ last_start_str = ""
 last_end_str = ""
 output_base = "output"
 if os.path.exists(output_base):
-    subfolders = sorted([f for f in os.listdir(output_base) if os.path.isdir(os.path.join(output_base, f))], reverse=True)
+    subfolders = sorted([f for f in os.listdir(output_base) if os.path.isdir(os.path.join(output_base, f))],
+                        reverse=True)
     for folder in subfolders:
         # Pattern: yyyyMMdd_HHmmss_YYYY-MM-DD_to_YYYY-MM-DD
         parts = folder.split('_')
@@ -200,7 +211,8 @@ if os.path.exists(output_base):
 
 print(f"Available range: {C_YELLOW}{available_start}{C_RESET} to {C_YELLOW}{available_end}{C_RESET}")
 if last_start_str and last_end_str:
-    print(f"Last used range: {C_BOLD}{C_GREEN}{last_start_str}{C_RESET} to {C_BOLD}{C_GREEN}{last_end_str}{C_RESET} (Press {C_BOLD}'L'{C_RESET} to reuse)")
+    print(
+        f"Last used range: {C_BOLD}{C_GREEN}{last_start_str}{C_RESET} to {C_BOLD}{C_GREEN}{last_end_str}{C_RESET} (Press {C_BOLD}'L'{C_RESET} to reuse)")
 
 print(f"Press {C_BOLD}Enter{C_RESET} to keep default or provide new range below.")
 
@@ -223,7 +235,8 @@ if user_start:
 if user_end:
     try:
         # Use .replace(hour=23, minute=59, second=59) for end date
-        available_end = pd.to_datetime(user_end).replace(hour=23, minute=59, second=59).tz_localize(df['dt_local'].dt.tz)
+        available_end = pd.to_datetime(user_end).replace(hour=23, minute=59, second=59).tz_localize(
+            df['dt_local'].dt.tz)
     except Exception as e:
         print_error(f"Invalid end date format: {e}. Using default.")
 
@@ -290,7 +303,7 @@ for h in range(24):
 if has_rates:
     avg_cost_profile = hourly_df.groupby('hour')['cost_cents'].mean()
     daily_cost_cents = hourly_df.set_index('dt_local').resample('D')['cost_cents'].sum()
-    
+
     # Ensure 'Other' has a default color if not in file
     if 'Other' not in tier_colors:
         tier_colors['Other'] = '#f0f0f0'
@@ -318,8 +331,9 @@ plt.figure(figsize=(15, 6))
 plt.plot(hourly_df['dt_local'], hourly_df['usage_kwh'], color='black', linewidth=1, zorder=3)
 
 # Add background colors for tiers if available
-if True: # Always add background, will use 'Other' if has_rates is False
+if True:  # Always add background, will use 'Other' if has_rates is False
     from matplotlib.patches import Patch
+
     # Plot background for each data point
     # To avoid many rectangles, we can find contiguous blocks of the same tier
     # or just iterate and fill per hour (more straightforward)
@@ -359,13 +373,14 @@ plt.figure(figsize=(10, 5))
 plt.plot(avg_kwh_profile.index, avg_kwh_profile.values, marker='o', color='black', zorder=3)
 
 # Add background colors for tiers if available
-if True: # Always add background, will use 'Other' if has_rates is False
+if True:  # Always add background, will use 'Other' if has_rates is False
     from matplotlib.patches import Patch
+
     for h in range(24):
         tier = tier_schedule[h]
         color = tier_colors.get(tier, DEFAULT_COLORS['Other'])
         plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.3, zorder=1)
-    
+
     if has_rates:
         legend_elements = [
             Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
@@ -379,7 +394,7 @@ if True: # Always add background, will use 'Other' if has_rates is False
         ]
         plt.legend(handles=legend_elements, loc='upper left')
 
-plt.title(f'Average Electricity Usage by Hour of Day ({tz_name})')
+plt.title(f'Average Electricity Usage by Hour of Day ({tz_name}), {start_str} to {end_str}')
 plt.xlabel(f'Hour of Day (24h) - {tz_name}')
 plt.ylabel('Average Usage (kWh)')
 plt.xticks(range(0, 24))
@@ -393,18 +408,20 @@ plt.figure(figsize=(12, 6))
 
 # Plot the stats
 plt.plot(amp_stats.index, amp_stats['mean'], label='Average Amps', color='black', marker='o', linewidth=2, zorder=3)
-plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='gray', alpha=0.3, label='Min-Max Range', zorder=2)
+plt.fill_between(amp_stats.index, amp_stats['min'], amp_stats['max'], color='gray', alpha=0.3, label='Min-Max Range',
+                 zorder=2)
 
 # Add background colors for tiers if available
-if True: # Always add background, will use 'Other' if has_rates is False
+if True:  # Always add background, will use 'Other' if has_rates is False
     from matplotlib.patches import Patch
     from matplotlib.lines import Line2D
+
     # We want to draw vertical spans for each hour's tier
     for h in range(24):
         tier = tier_schedule[h]
         color = tier_colors.get(tier, DEFAULT_COLORS['Other'])
         plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.4, zorder=1)
-        
+
     # Create custom legend for tiers
     legend_elements = []
     if has_rates:
@@ -425,7 +442,7 @@ if True: # Always add background, will use 'Other' if has_rates is False
     ])
     plt.legend(handles=legend_elements, loc='upper left')
 
-plt.title(f'Hourly Ampere Profile (at 120V) - Local Time ({tz_name})')
+plt.title(f'Hourly Ampere Profile (at 120V) - Local Time ({tz_name}), {start_str} to {end_str}')
 plt.xlabel(f'Hour of Day (24h) - Local Time ({tz_name})')
 plt.ylabel('Current (Amperes)')
 plt.xticks(range(0, 24))
@@ -438,20 +455,20 @@ if has_rates:
     # Graph 4: Hourly Average Cost Profile
     plt.figure(figsize=(10, 5))
     plt.plot(avg_cost_profile.index, avg_cost_profile.values, marker='s', color='black', zorder=3)
-    
+
     # Add background colors for tiers
     for h in range(24):
         tier = tier_schedule[h]
         color = tier_colors.get(tier, '#f0f0f0')
         plt.axvspan(h - 0.5, h + 0.5, facecolor=color, alpha=0.3, zorder=1)
-    
+
     legend_elements = [
         Patch(facecolor=tier_colors.get(name), alpha=0.3, label=f'{name} (Weekday)')
         for name in tier_names_list
     ]
     plt.legend(handles=legend_elements, loc='upper left')
 
-    plt.title(f'Average Electricity Cost by Hour of Day ({tz_name})')
+    plt.title(f'Average Electricity Cost by Hour of Day ({tz_name}), {start_str} to {end_str}')
     plt.xlabel(f'Hour of Day (24h) - {tz_name}')
     plt.ylabel('Average Cost (¢)')
     plt.xticks(range(0, 24))
@@ -478,13 +495,13 @@ if has_rates:
     # Prepare data: sum usage per day and tier
     # We use dt_local.dt.date for grouping by day
     daily_tier_usage = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['usage_kwh'].sum().unstack().fillna(0)
-    
+
     # Use the same tier_colors
     current_tier_colors = [tier_colors.get(tier, DEFAULT_COLORS['Other']) for tier in daily_tier_usage.columns]
-    
+
     ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
     plt.legend(title="Rate Tier")
-    
+
     # Calculate totals for labels
     totals = daily_tier_usage.sum(axis=1)
 else:
@@ -495,7 +512,7 @@ else:
         if t not in daily_tier_usage.columns:
             daily_tier_usage[t] = 0.0
     daily_tier_usage = daily_tier_usage[['Off-Peak', 'Other']]
-    
+
     current_tier_colors = [DEFAULT_COLORS['Off-Peak'], DEFAULT_COLORS['Other']]
     ax = daily_tier_usage.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
     plt.legend(title="Default Tier (Night: 10PM-7AM)")
@@ -504,7 +521,7 @@ else:
 # Add total values on top of bars
 for i, total in enumerate(totals):
     if total > 0:
-        plt.text(i, total + (totals.max() * 0.01), f'{total:.1f}', 
+        plt.text(i, total + (totals.max() * 0.01), f'{total:.1f}',
                  ha='center', va='bottom', rotation=90, fontsize=9)
 
 plt.title(f'Daily Electricity Usage Total ({tz_name})')
@@ -522,15 +539,15 @@ if has_rates:
     # Stacked bar by tier for cost
     daily_tier_cost = hourly_df.groupby([hourly_df['dt_local'].dt.date, 'tier'])['cost_cents'].sum().unstack().fillna(0)
     current_tier_colors = [tier_colors.get(tier, DEFAULT_COLORS['Other']) for tier in daily_tier_cost.columns]
-    
+
     ax = daily_tier_cost.plot(kind='bar', stacked=True, color=current_tier_colors, ax=plt.gca())
     plt.legend(title="Rate Tier")
-    
+
     # Calculate totals for labels
     cost_totals = daily_tier_cost.sum(axis=1)
     for i, total in enumerate(cost_totals):
         if total > 0:
-            plt.text(i, total + (cost_totals.max() * 0.01), f'{total:.1f}', 
+            plt.text(i, total + (cost_totals.max() * 0.01), f'{total:.1f}',
                      ha='center', va='bottom', rotation=90, fontsize=9)
 
     plt.title(f'Daily Electricity Cost Total ({tz_name})')
@@ -548,12 +565,12 @@ if has_rates:
     # Get colors for existing tiers in this dataset
     pie_colors1 = [tier_colors.get(t, '#f0f0f0') for t in tier_usage.index]
     tier_usage.plot(kind='pie', autopct='%1.1f%%', ax=ax1, colors=pie_colors1)
-    ax1.set_title('Usage (kWh) by Rate Tier')
+    ax1.set_title(f'Usage (kWh) by Rate Tier, {start_str} to {end_str}')
     ax1.set_ylabel('')
 
     pie_colors2 = [tier_colors.get(t, '#f0f0f0') for t in tier_cost_cents.index]
     tier_cost_cents.plot(kind='pie', autopct='%1.1f%%', ax=ax2, colors=pie_colors2)
-    ax2.set_title('Cost (¢) by Rate Tier')
+    ax2.set_title(f'Cost (¢) by Rate Tier, {start_str} to {end_str}')
     ax2.set_ylabel('')
 
     plt.tight_layout()
